@@ -4,9 +4,14 @@ import random
 import enum
 from abc import ABC, abstractmethod
 from typing_extensions import override
-from typing import Any
+from typing import Any, Callable, ClassVar
+import functools
+import inspect
 
 import numpy as np
+import pydantic
+
+from Internals.logger import logger
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 class RegressionLoss(enum.Enum):
@@ -88,7 +93,7 @@ class RegressionGradientI(ABC):
     def __call__(self, X: np.ndarray, y: np.ndarray, prediction: np.ndarray, bias: bool) -> tuple[np.ndarray, np.ndarray]:
         ...
 
-class MSEGradient:
+class MSEGradient(RegressionGradientI):
     """Calculate gradient of  MSE loss function."""
 
     @override
@@ -112,7 +117,7 @@ class MSEGradient:
     def __repr__(self) -> str:
         return f'MSEGradient()'
     
-class MAEGradient:
+class MAEGradient(RegressionGradientI):
     """Calculate gradient of  MAE loss function."""
 
     @override
@@ -129,12 +134,12 @@ class MAEGradient:
             tuple[np.ndarray, np.ndarray]: Tuple with partial derivatives of  MAE loss function.
         """
         sign = np.sign(y - prediction)
-        return (X.T @ (-sign),  np.array([-sign.item()])) if bias else (X.T @ (-sign), np.array([0.0]))
+        return (X.T @ (-sign),  -sign) if bias else (X.T @ (-sign), np.array([0.0]))
     
     def __repr__(self) -> str:
         return f'MAEGradient()'
     
-class SinMSEGradient:
+class SinMSEGradient(RegressionGradientI):
     """Calculate gradient of  SinMSE loss function."""
 
     @override
@@ -160,6 +165,8 @@ class SinMSEGradient:
         return f'SinMSEGradient()'
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 class EarlyStopping(enum.Enum):
+    """Enumerates avaliable early stopping mechanisms."""
+
     GRADIENT_NORM = 'Gradient norm'
     PARAMETERS_CHANGE = 'Parameters change'
     FUNCTION_CHANGE =  'Function change'
@@ -175,9 +182,23 @@ class EarlyStoppingI(ABC):
                  prediction_after: np.ndarray,
                  treshold: int | float
                  ) -> bool:
-        ...
+        """Perform required check do define either to continue gradient descent or stop early.
+
+        Args:
+            params_before_step: model parameters before gradient step.
+            grad: partial derivatives with respect to model parameters withing defined loss  function.
+            params_after_step: model parameters after  gradient step.
+            prediction_before: model prediction before gradient step.
+            predictoin_after: model prediction after gradient step.
+
+        Returns:
+            bool: True if to stop gradient descent early, False otherwise.
+        """
 
 class GradientNormStopping(EarlyStoppingI):
+    """Stops gradient descent early when gradient norm is smaller then defined treshold."""
+
+    @override
     def __call__(self, 
                  params_before_step: np.ndarray,
                  grad: tuple[np.ndarray, np.ndarray],
@@ -196,6 +217,9 @@ class GradientNormStopping(EarlyStoppingI):
         return f'GradientNormStopping()'
     
 class ParametersChangeStopping(EarlyStoppingI):
+    """Stops gradient descent early when parameters change is smaller then defined treshold."""
+
+    @override
     def __call__(self, 
                  params_before_step: np.ndarray,
                  grad: tuple[np.ndarray, np.ndarray],
@@ -214,6 +238,9 @@ class ParametersChangeStopping(EarlyStoppingI):
         return f'ParametersChangeStopping()'
     
 class FunctionChangeStopping(EarlyStoppingI):
+    """Stops gradient descent when model output change is smaller then defined treshold."""
+
+    @override
     def __call__(self, 
                  params_before_step: np.ndarray,
                  grad: tuple[np.ndarray, np.ndarray],
@@ -224,8 +251,56 @@ class FunctionChangeStopping(EarlyStoppingI):
                  ) -> bool:
         function_change = np.mean(np.abs(prediction_after - prediction_before))
         return True if function_change != 0 and  function_change < treshold else False
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+class ParamsInitialization(enum.Enum):
+    """Enumaration of avaliable params initialization functions."""
+    RANDOM_UNIFORM =  'Random uniform'
+    CONSTANT  = 'constant'
 
+# Type alias for params initialization functions
+PARAMS_INITIALIZER = Callable[[tuple[int, int]], tuple[np.array, np.array]]
 
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+class ValidateType:
+    """Decorator to validate types of arguments provided to a function.
+    
+    Args:
+        expected_type: (tuple[str, Any] | list[tuple[str, Any]]):  expected type for provided argument.
+    """
+    
+    def __init__(self, expected_type: tuple[str, Any] | list[tuple[str, Any]]):
+        self.expected_type = expected_type
+    
+    @staticmethod
+    def _validate_arg(arg_name: Any, expected_type: Any, kwargs: dict) -> None:
+        arg = kwargs[arg_name]
+        if not isinstance(arg, expected_type) and not (inspect.isclass(arg) and 
+                                                       issubclass(arg, expected_type)):
+            raise TypeError(f'Invalid input type for {arg_name}: expected: {expected_type}')    
+      
+    @staticmethod      
+    def _check_missing_arguments(expected_type, provided_type) -> None:
+        # wrap expected type into list to avoid separate logic for not list case
+        if not isinstance(expected_type, list):
+            expected_type = [expected_type]
+            
+        for arg, _ in expected_type:
+            if not arg in provided_type:
+                raise KeyError(f'Required keyword argument {arg} is not found.')
+                    
+    def __call__(self, func: Callable) -> Callable:
+        """Decorator call method that applies validation logic."""
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            self._check_missing_arguments(self.expected_type, kwargs)
+            
+            if isinstance(self.expected_type, list):
+                for arg, expected_type in self.expected_type:
+                    self._validate_arg(arg, expected_type, kwargs)   
+            else:
+                self._validate_arg(kwargs[self.expected_type[0]], self.expected_type[1])   
+            return func(*args, **kwargs)
+        return wrapper
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 class Model(ABC):
     """Base class for machine learning models."""
@@ -236,11 +311,11 @@ class Model(ABC):
         ...
         
     @abstractmethod
-    def predict(self, x: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray) -> np.ndarray:
         """Perform forward pass of a model."""
         ...
         
-class LinearRegression(Model):
+class LinearRegression(Model, pydantic.BaseModel):
     """Implements linear regression machine learning model. Forward pass: f(x) = x * w  + b.
 
     Args:
@@ -248,41 +323,48 @@ class LinearRegression(Model):
         n_iters: Number of backprogation iterations.
         bias: Indicate if include  bias parameter in forward pass or not.
         loss:  Define which loss function will be minimized.
+        early_stopping: Define which early stopping mechanism to use.
+        early_stopping_treshold: Defines treshold for early stopping.
+        params_initialization: Defines how params will be initialized.
     """
-    _losses: dict[RegressionLossFunctionI, dict[str, RegressionLossFunctionI | RegressionGradientI]] =  {
-        RegressionLoss.MSE: {'loss_fn': MSE(), 'grad': MSEGradient()},
-        RegressionLoss.MAE: {'loss_fn': MAE(), 'grad': MAEGradient()}
+    model_config =  pydantic.ConfigDict(arbitrary_types_allowed=True)
+
+    _losses: ClassVar[dict[RegressionLossFunctionI, tuple[RegressionLossFunctionI, RegressionGradientI]]] =  {
+        RegressionLoss.MSE: (MSE(), MSEGradient()),
+        RegressionLoss.MAE: (MAE(), MAEGradient())
         }
     
-    _early_stoppings : dict[str, EarlyStoppingI] = {
+    _early_stoppings : ClassVar[dict[str, EarlyStoppingI]] = {
         EarlyStopping.GRADIENT_NORM:  GradientNormStopping(),
         EarlyStopping.PARAMETERS_CHANGE: ParametersChangeStopping(),
         EarlyStopping.FUNCTION_CHANGE: FunctionChangeStopping()
         }
+    
+    _params_initializations: ClassVar[dict[str, PARAMS_INITIALIZER]] = {
+         ParamsInitialization.RANDOM_UNIFORM: lambda input_dims: (np.random.uniform(-1, 1, input_dims[-1]), np.zeros(input_dims[0])),
+         ParamsInitialization.CONSTANT: lambda input_dims: (np.full(shape=input_dims[-1], fill_value=0.0), np.full(shape=input_dims[0], fill_value=0.0))
+    }
 
-    def __init__(
-            self, 
-            learning_rate: int | float = 0.001, 
-            n_iters: int = 10, 
-            bias: bool = True, 
-            loss: RegressionLoss = RegressionLoss.MSE,
-            early_stopping = EarlyStopping.GRADIENT_NORM,
-            early_stopping_treshold: int  | float = 0.00001
-            ):
-        self.learning_rate = learning_rate
-        self.n_iters = n_iters
-        self.bias = bias
-        self.loss = loss
-        self.early_stopping = early_stopping
-        self.early_stopping_treshold = early_stopping_treshold
-        self._loss_fn = self._losses[self.loss]['loss_fn']
-        self._grad = self._losses[self.loss]['grad']
+    learning_rate: int | float = pydantic.Field(default=0.001)
+    n_iters: int =  pydantic.Field(default=10)
+    bias: bool = pydantic.Field(default=True)
+    loss: RegressionLoss = pydantic.Field(default=RegressionLoss.MSE)
+    early_stopping: EarlyStopping = pydantic.Field(default=EarlyStopping.GRADIENT_NORM)
+    early_stopping_treshold: float = pydantic.Field(default=0.00001)
+    params_initialization: ParamsInitialization = pydantic.Field(default=ParamsInitialization.RANDOM_UNIFORM)
+    w: np.ndarray = pydantic.Field(default=None)
+    b: np.ndarray = pydantic.Field(default=None)
+
+    def model_post_init(self, context):
+        self._loss_fn, self._grad = self._losses[self.loss]
         self._early_stopping = self._early_stoppings[self.early_stopping]
+        self._params_initialization = self._params_initializations[self.params_initialization]
 
     def __repr__(self):
         return f'LinearRegression(learning_rate={self.learning_rate}, n_iters={self.n_iters}, bias={self.bias}, loss={self.loss})'
     
     @classmethod
+    @ValidateType(expected_type=[('loss_function_name',  RegressionLoss),  ('loss_function', RegressionLossFunctionI), ('grad',  RegressionGradientI)])
     def _register_loss(cls, 
                        loss_function_name: RegressionLoss,
                        loss_function: RegressionLossFunctionI, 
@@ -295,19 +377,32 @@ class LinearRegression(Model):
             loss_function: Object which will calculate loss with defined formula.
             grad: Object which calculates gradies of provided loss function  with respect to model  parameters.
         """
-        cls._losses[loss_function_name]  =  {'loss_fn': loss_function(), 'grad': grad()}
+        cls._losses[loss_function_name]  =  (loss_function(), grad())
 
     @classmethod
-    def _register_early_stopping(cls, early_stopping_name: EarlyStopping, early_stopping: EarlyStoppingI):
-        cls._early_stoppings[early_stopping_name] = early_stopping()
-
-    def  _initialize_params(self, input_dims: tuple[int, int]) -> None:
-        """Initialize model weights and bias with respect to input  vector dimentionality.
+    @ValidateType(expected_type=[('early_stopping_name',  EarlyStopping),  ('early_stopping', EarlyStoppingI)])
+    def _register_early_stopping(cls, early_stopping_name: EarlyStopping, early_stopping: EarlyStoppingI) -> None:
+        """Register new  early stopping.
 
         Args:
-            input_dims: Dimentionalties of input  vector.
+            early_stopping_name: Key on which new early stopping will be stored.
+            early_stopping: Object that performs early stopping.
+
         """
-        self.w, self.b = np.random.uniform(-1, 1, input_dims[-1]), np.zeros(input_dims[0])
+        cls._early_stoppings[early_stopping_name] = early_stopping()
+
+    @classmethod
+    def _register_params_initialization(cls, params_initialization_name: ParamsInitialization, params_initialization: PARAMS_INITIALIZER):
+        """Register new params initialization function.
+
+        Args:
+            params_initialization_name: Key on which  new params initialization  function will be stored.
+            params_initialization: Function thath initialize model params.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Tuple with initialized weights and bias.
+        """
+        cls._params_initializations[params_initialization_name] = params_initialization
     
     def _step(self, X: np.ndarray, y: np.ndarray) -> bool:
         """Perform one step of gradient descent with respect  to provided loss function.
@@ -317,13 +412,13 @@ class LinearRegression(Model):
             y: Targets.
         """
         params_before_step = [self.w.copy(),  self.b.copy()]
-        prediction_before = self.predict(X)
-        dw, db = self._grad(X, y, self.predict(X), self.bias)
+        prediction_before = self.predict(X=X)
+        dw, db = self._grad(X, y, self.predict(X=X), self.bias)
         self.w -= self.learning_rate * dw
         self.b -= self.b - self.learning_rate * db
         grad = [dw, db]
         params_after_step = [self.w, self.b]
-        prediction_after = self.predict(X)
+        prediction_after = self.predict(X=X)
         return self._early_stopping(params_before_step=params_before_step, 
                                     grad=grad,
                                     params_after_step=params_after_step,
@@ -333,6 +428,7 @@ class LinearRegression(Model):
                                     )
 
     @override
+    @ValidateType(expected_type=[('X', np.ndarray), ('y', np.ndarray), ('verbose', bool)])
     def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = True) -> None:
         """Iterativaly perfrom gradient descent steps with respect to specified  loss  function.
 
@@ -341,13 +437,13 @@ class LinearRegression(Model):
             y: Targets.
             verbose: Show loss function value on each  iteration, if True.
         """
-
-        self._initialize_params(X.shape)
+        self.w, self.b = self._params_initialization(X.shape)
         for iteration in range(self.n_iters):
-            if verbose: print(f'Loss {iteration}: {self._loss_fn(y, self.predict(X))}')
+            if verbose: logger.info(f'Loss {iteration}: {self._loss_fn(y, self.predict(X=X))}')
             if self._step(X, y): break
 
     @override  
+    @ValidateType(expected_type=[('X', np.ndarray)])
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Perform forward pass of linear regression.
 
@@ -357,18 +453,23 @@ class LinearRegression(Model):
         Returns:
             np.ndarray: Result of forward pass with input matrix.
         """
-        return X @ self.w + self.b if self.bias else X @ self.w
+        return X @ self.w + self.b[0] if self.bias else X @ self.w
         
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # Register custom loss function to LinearRegression
     LinearRegression._register_loss(loss_function_name=RegressionLoss.SINMSE,
-                                             loss_function=SinMSE,
-                                             grad=SinMSEGradient)
+                                    loss_function=SinMSE,
+                                    grad=SinMSEGradient)
     
     # Initialize model with specific loss function
-    model = LinearRegression()
-
+    model = LinearRegression(learning_rate=0.001,
+                             n_iters=1000,
+                             loss=RegressionLoss.SINMSE,
+                             early_stopping=EarlyStopping.GRADIENT_NORM,
+                             early_stopping_treshold=0.0000001,
+                             params_initialization=ParamsInitialization.RANDOM_UNIFORM
+                             )
     # Initialize  training  set
     X = np.array([
         [1, 1], 
@@ -376,8 +477,9 @@ if __name__ == '__main__':
         [3, 3], 
         [4, 4]
         ])
-    y = np.array([6, 9, 3, 2])
+    y = np.array([2, 4, 6, 8])
 
     # Fit the model and make prediction.
-    model.fit(X, y)
-    print(model.predict(X))
+    model.fit(X=X, y=y, verbose=True)
+    print(f'Predicting set:', model.predict(X=X))
+    print(f'Predicting sample:', model.predict(X=np.array([5,5])))

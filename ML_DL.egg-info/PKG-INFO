@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: ML-DL
+Version: 0.1.0
+Summary: Framework for learning ML&DL with hands on implementations.
+Home-page: https://github.com/NazarLenyshyn6/PythonPytorchProfiling/tree/main
+Author: Nazar Lenyshyn
+Author-email: nazarleny01@gmail.com
+Requires-Python: >=3.7
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: requires-python
+Dynamic: summary
