@@ -428,8 +428,8 @@ class LinearRegression(Model, pydantic.BaseModel):
                                     )
 
     @override
-    @ValidateType(expected_type=[('X', np.ndarray), ('y', np.ndarray), ('verbose', bool)])
-    def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = True) -> None:
+    @ValidateType(expected_type=[('X', np.ndarray), ('y', np.ndarray)])
+    def fit(self, X: np.ndarray, y: np.ndarray, verbose: bool = False) -> None:
         """Iterativaly perfrom gradient descent steps with respect to specified  loss  function.
 
         Args:
