@@ -6,6 +6,7 @@ import numpy as np
 
 from Internals.utility import shuffle_arrays
 
+
 def train_test_split(
         *sets, 
         train_size: float = None, 
@@ -55,6 +56,7 @@ def train_test_split(
         splits.append(set[:train_threshold])
         splits.append(set[train_threshold:])
     return splits
+
 
 def cross_validate(
         X: np.ndarray, 
