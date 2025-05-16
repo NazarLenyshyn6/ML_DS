@@ -319,7 +319,7 @@ class LinearRegression(Model, pydantic.BaseModel):
     """Implements linear regression machine learning model. Forward pass: f(x) = x * w  + b.
 
     Args:
-        learning_rate: converage step.
+        learning_rate: Size of converage step.
         n_iters: Number of backprogation iterations.
         bias: Indicate if include  bias parameter in forward pass or not.
         loss:  Define which loss function will be minimized.
