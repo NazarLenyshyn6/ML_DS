@@ -1,3 +1,5 @@
+import re
+
 import pytest
 import numpy as np
 import contextlib
@@ -17,40 +19,64 @@ def test_shuffle_arrays():
 
 
 @pytest.mark.parametrize(
-        'X, Y, has_exception, exception_message', 
+        'X, Y, raised_exception', 
         [
-            (np.random.randn(10, 2), np.random.randn(10, 1), False, ""), 
-            (np.random.randn(10, 2), 10, True, "X and y must be NumPy arrays."),
-            (np.random.randn(10,2,2), np.random.randn(10,2), True, "X and y must be 2D arrays."),
-            (np.random.randn(1,2), np.random.randn(10,2), True, "X and y must have the same number of samples."),
-            (np.random.randn(1,2), np.random.randn(1,2), True, "y must have shape (n_samples, 1)."),
+            (
+                np.random.randn(10, 2), 
+                np.random.randn(10, 1), 
+                contextlib.nullcontext()
+                ), 
+            (
+                np.random.randn(10, 2), 
+                10, 
+                pytest.raises(TypeError, match="X and y must be NumPy arrays.")
+                ),
+            (
+                np.random.randn(10,2,2), 
+                np.random.randn(10,2), 
+                pytest.raises(ValueError, match="X and y must be 2D arrays.")
+                ),
+            (
+                np.random.randn(1,2), 
+                np.random.randn(10,2), 
+                pytest.raises(ValueError, match="X and y must have the same number of samples.")
+                ),
+            (
+                np.random.randn(1,2), 
+                np.random.randn(1,2), 
+                pytest.raises(ValueError, match=re.escape("y must have shape (n_samples, 1)."))),
             ]
         )
-def test_validate_fit_inputs(X, Y, has_exception, exception_message):
-    if has_exception:
-        try:
-            validate_fit_inputs(X, Y)
-        except Exception as e:
-            assert str(e) == exception_message
-    else:
-        assert validate_fit_inputs(X, Y) is None
+def test_validate_fit_inputs(X, Y, raised_exception):
+    with raised_exception:
+        validate_fit_inputs(X, Y)
 
 @pytest.mark.parametrize(
-        'X, w, has_exception, exception_message', 
+        'X, w, raised_exception', 
         [
-            (np.random.randn(10, 2), np.random.randn(2, 1), False, ""), 
-            (1, np.random.randn(2, 1), True, "X must be a NumPy array."), 
-            (np.random.randn(10, 2), np.random.randn(3, 1), True, "X must have shape (n_samples, 3)."), 
+            (
+                np.random.randn(10, 2),
+                np.random.randn(2, 1), 
+                contextlib.nullcontext()), 
+            (
+                1, 
+                np.random.randn(2, 1), 
+                pytest.raises(TypeError, match="X must be a NumPy array.")
+                ), 
+            (
+                np.random.randn(10, 1, 1), np.random.randn(1, 1), 
+                pytest.raises(ValueError, match=re.escape("X must be a 2D array."))
+                ),
+            (
+                np.random.randn(10, 2), 
+                np.random.randn(3, 1), 
+                pytest.raises(ValueError, match=re.escape("X must have shape (n_samples, 3)."))
+                ), 
             ]
         )
-def test_validate_predict_input(X, w, has_exception, exception_message):
-    if has_exception:
-        try:
-            validate_predict_input(X, w)
-        except Exception as e:
-            assert str(e) == exception_message
-    else:
-        assert validate_predict_input(X, w) is None
+def test_validate_predict_input(X, w, raised_exception):
+    with raised_exception:
+        validate_predict_input(X, w)
 
 @pytest.mark.parametrize(
         'array, required_n_dims, raised_exception', 
