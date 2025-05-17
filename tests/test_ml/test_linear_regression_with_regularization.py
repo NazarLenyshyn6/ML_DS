@@ -8,7 +8,7 @@ import pydantic
 from ML.src.linear_regression_with_regularization import Ridge
 from ML.src.linear_regression_with_regularization import Lasso
 
-
+#
 @pytest.mark.parametrize(
         'model, model_config, raised_exception', 
         [
@@ -27,20 +27,90 @@ def test_linear_regression_with_regularization_initialization(model, model_confi
 @pytest.mark.parametrize(
         'model, X, Y, raised_exception', 
         [
-            (Lasso(), np.random.randn(100, 2), np.random.randn(100, 1), contextlib.nullcontext()), 
-            (Ridge(), np.random.randn(100, 2), np.random.randn(100, 1), contextlib.nullcontext()),
-            (Lasso(), 1, np.random.randn(100, 1), pytest.raises(TypeError, match="X and y must be NumPy arrays.")), 
-            (Ridge(), 1, np.random.randn(100, 1), pytest.raises(TypeError, match="X and y must be NumPy arrays.")),
-            (Lasso(), np.random.randn(100, 2), 1, pytest.raises(TypeError, match="X and y must be NumPy arrays.")), 
-            (Ridge(), np.random.randn(100, 2), 1, pytest.raises(TypeError, match="X and y must be NumPy arrays.")),
-            (Lasso(), np.random.randn(100, 2), np.random.randn(100, 2, 1), pytest.raises(ValueError, match="X and y must be 2D arrays.")), 
-            (Ridge(), np.random.randn(100, 2), np.random.randn(100, 2, 1), pytest.raises(ValueError, match="X and y must be 2D arrays.")),
-            (Lasso(), np.random.randn(100, 2, 1), np.random.randn(100, 2), pytest.raises(ValueError, match="X and y must be 2D arrays.")), 
-            (Ridge(), np.random.randn(100, 2, 1), np.random.randn(100, 2), pytest.raises(ValueError, match="X and y must be 2D arrays.")),
-            (Lasso(), np.random.randn(101, 2), np.random.randn(100, 2), pytest.raises(ValueError, match="X and y must have the same number of samples.")), 
-            (Ridge(), np.random.randn(101, 2), np.random.randn(100, 2), pytest.raises(ValueError, match="X and y must have the same number of samples.")),
-            (Lasso(), np.random.randn(100, 2), np.random.randn(100, 2), pytest.raises(ValueError, match=re.escape("y must have shape (n_samples, 1)."))), 
-            (Ridge(), np.random.randn(100, 2), np.random.randn(100, 2), pytest.raises(ValueError,  match=re.escape("y must have shape (n_samples, 1)."))),
+            (
+                Lasso(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 1), 
+                contextlib.nullcontext()
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 1), 
+                contextlib.nullcontext()
+                ),
+            (
+                Lasso(), 
+                1, 
+                np.random.randn(100, 1), 
+                pytest.raises(TypeError, match="X and y must be NumPy arrays.")
+                ), 
+            (
+                Ridge(), 
+                1, 
+                np.random.randn(100, 1), 
+                pytest.raises(TypeError, match="X and y must be NumPy arrays.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(100, 2), 
+                1, 
+                pytest.raises(TypeError, match="X and y must be NumPy arrays.")
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(100, 2), 
+                1, 
+                pytest.raises(TypeError, match="X and y must be NumPy arrays.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 2, 1), 
+                pytest.raises(ValueError, match="X and y must be 2D arrays.")
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 2, 1), 
+                pytest.raises(ValueError, match="X and y must be 2D arrays.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(100, 2, 1), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError, match="X and y must be 2D arrays.")
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(100, 2, 1), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError, match="X and y must be 2D arrays.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(101, 2), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError, match="X and y must have the same number of samples.")
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(101, 2), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError, match="X and y must have the same number of samples.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError, match=re.escape("y must have shape (n_samples, 1)."))
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(100, 2), 
+                np.random.randn(100, 2), 
+                pytest.raises(ValueError,  match=re.escape("y must have shape (n_samples, 1)."))
+                ),
             ]
             )
 def test_linear_regression_with_regularization_fit(model, X, Y, raised_exception):
@@ -50,14 +120,46 @@ def test_linear_regression_with_regularization_fit(model, X, Y, raised_exception
 @pytest.mark.parametrize(
         'model, X, raised_exception', 
         [
-            (Lasso(), np.random.randn(10, 2), contextlib.nullcontext()), 
-            (Ridge(), np.random.randn(10, 2), contextlib.nullcontext()),
-            (Lasso(), 1, pytest.raises(TypeError, match="X must be a NumPy array.")), 
-            (Ridge(), 1, pytest.raises(TypeError, match="X must be a NumPy array.")),
-            (Lasso(), np.random.randn(10, 2, 2), pytest.raises(ValueError, match="X must be a 2D array.")), 
-            (Ridge(), np.random.randn(10, 2, 2), pytest.raises(ValueError, match="X must be a 2D array.")),
-            (Lasso(), np.random.randn(10, 4), pytest.raises(ValueError, match=re.escape("X must have shape (n_samples, 2)."))), 
-            (Ridge(), np.random.randn(10, 4), pytest.raises(ValueError, match=re.escape("X must have shape (n_samples, 2)."))),
+            (
+                Lasso(), 
+                np.random.randn(10, 2), 
+                contextlib.nullcontext()
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(10, 2), 
+                contextlib.nullcontext()
+                ),
+            (
+                Lasso(), 
+                1, 
+                pytest.raises(TypeError, match="X must be a NumPy array.")
+                ), 
+            (
+                Ridge(), 
+                1, 
+                pytest.raises(TypeError, match="X must be a NumPy array.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(10, 2, 2), 
+                pytest.raises(ValueError, match="X must be a 2D array.")
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(10, 2, 2), 
+                pytest.raises(ValueError, match="X must be a 2D array.")
+                ),
+            (
+                Lasso(), 
+                np.random.randn(10, 4), 
+                pytest.raises(ValueError, match=re.escape("X must have shape (n_samples, 2)."))
+                ), 
+            (
+                Ridge(), 
+                np.random.randn(10, 4), 
+                pytest.raises(ValueError, match=re.escape("X must have shape (n_samples, 2)."))
+                ),
             ]
         )
 def test_linear_regression_with_regularization_predict(model, X, raised_exception):
