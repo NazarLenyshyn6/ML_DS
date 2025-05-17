@@ -2,10 +2,18 @@ import pytest
 import numpy as np
 import contextlib
 
+from Internals.utility import shuffle_arrays
 from Internals.utility import validate_fit_inputs
 from Internals.utility import validate_predict_input
 from Internals.utility import check_array_dims
 from Internals.utility import check_dtype
+
+
+def test_shuffle_arrays():
+    X = np.random.randn(100, 1)
+    X_shuffled_1 = shuffle_arrays(X, random_state=22)
+    X_shuffled_2 = shuffle_arrays(X, random_state=22)
+    assert all(X_shuffled_1[0] == X_shuffled_2[0])
 
 
 @pytest.mark.parametrize(
