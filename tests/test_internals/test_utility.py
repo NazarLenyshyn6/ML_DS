@@ -25,7 +25,7 @@ def test_validate_fit_inputs(X, Y, has_exception, exception_message):
         except Exception as e:
             assert str(e) == exception_message
     else:
-        validate_fit_inputs(X, Y)
+        assert validate_fit_inputs(X, Y) is None
 
 @pytest.mark.parametrize(
         'X, w, has_exception, exception_message', 
@@ -42,7 +42,7 @@ def test_validate_predict_input(X, w, has_exception, exception_message):
         except Exception as e:
             assert str(e) == exception_message
     else:
-        ...
+        assert validate_predict_input(X, w) is None
 
 @pytest.mark.parametrize(
         'array, required_n_dims, raised_exception', 
