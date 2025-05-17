@@ -124,24 +124,28 @@ def validate_predict_input(X: np.ndarray, w: np.ndarray):
         raise ValueError(f"X must have shape (n_samples, {w.shape[0]}).")
     
 def check_array_dims(array: np.ndarray, required_n_dims: int):
-    """Validate if NumPy array has required number of dimentions.
+    """Validate if NumPy array has required number of dimensions.
 
     Args:
         array: NumPy array for validation.
-        reqired_n_dims: Required number of dimentions.
+        required_n_dims: Required number of dimensions.
 
     Raises:
-        ValueError: If number of dimentions in input array are different from required.
+        ValueError: If number of dimensions in input array differs from required.
     """
     if not array.ndim == required_n_dims:
         raise ValueError(f'Array must have {required_n_dims} dimentions, got instead: {array.ndim}')
     
 def check_dtype(input: Any, input_name: str, required_dtype: Any):
-    """Validate if type of input corresponds to required data type.
+    """Validate input type.
 
-    input: Object for type validation.
-    input_name: Name for the object with incorrect data type to indicate in error message.
-    required_dtype: Inputs exptected data type.
+    Args:
+        input: Object to validate.
+        input_name: Name to use in the error message.
+        required_dtype: Expected data type.
+
+    Raises:
+        TypeError: If input does not match expected type.
     """
     if not isinstance(input, required_dtype):
         raise TypeError(f'{input_name} has to be of type {required_dtype}, got instead: {type(input)}')
